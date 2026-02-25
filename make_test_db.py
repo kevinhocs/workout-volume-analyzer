@@ -12,10 +12,11 @@ DB_NAME = "test.db"
 conn = sqlite3.connect(DB_NAME)
 
 # ----------------------------------------------------------------------
-# Reset schema (idempotent)
+# Reset schema 
 # ----------------------------------------------------------------------
 
 conn.execute("DROP TABLE IF EXISTS sets")
+conn.execute("DROP TABLE IF EXISTS exercises")
 conn.execute("DROP TABLE IF EXISTS sessions")
 
 # ----------------------------------------------------------------------
@@ -30,8 +31,16 @@ CREATE TABLE sessions (
 """)
 
 conn.execute("""
+CREATE TABLE exercises (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+)
+""")
+
+conn.execute("""
 CREATE TABLE sets (
     session_id INTEGER NOT NULL,
+    exercise_id INTEGER NOT NULL,
     reps INTEGER NOT NULL,
     weight REAL NOT NULL
 )
@@ -46,16 +55,25 @@ conn.executemany(
     [
         (1, "2026-02-01"),
         (2, "2026-02-03"),
-        (3, "2026-02-05"),
     ]
 )
 
 conn.executemany(
-    "INSERT INTO sets VALUES (?, ?, ?)",
+    "INSERT INTO exercises VALUES (?, ?)",
     [
-        (1, 5, 100),
-        (1, 5, 120),
-        (2, 3, 200),
+        (1, "Squat"),
+        (2, "Bench Press"),
+        (3, "Deadlift"),
+    ]
+)
+
+conn.executemany(
+    "INSERT INTO sets VALUES (?, ?, ?, ?)",
+    [
+        (1, 1, 5, 100), # Session 1, Squat
+        (1, 2, 5, 120), # Session 1, Bench Press
+        (2, 3, 3, 150), # Session 2, Deadlift
+        (2, 1, 3, 200), # Session 2, Squat
     ]
 )
 
