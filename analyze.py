@@ -104,7 +104,39 @@ def main():
 
     sessions = load_sessions(conn)
     if audit_mode:
-        print(f"Loaded {len(sessions)} sessions from database")
+        print(f"Total sessions loaded: {len(sessions)}")
+
+        dates = sorted(sessions.values())
+        print(f"Date range: {dates[0]} to {dates[-1]}")
+
+        # Count exercise
+        curr = conn.execute("SELECT id, name FROM exercises")
+        exercises = curr.fetchall()
+
+        print(f"Distinct exercises: {len(exercises)}")
+        print()
+
+        for exercise_id, exercise_name in exercises:
+            curr = conn.execute(
+                "SELECT MAX(weight) FROM sets WHERE exercise_id=? GROUP BY session_id",
+                (exercise_id,)
+            )
+
+            top_sets = [row[0] for row in curr.fetchall()]
+
+            if not top_sets:
+                continue
+
+            mean = sum(top_sets) / len(top_sets)
+            variance = sum((x - mean) ** 2 for x in top_sets) / len(top_sets)
+            std_dev = variance ** 0.5
+
+            print(f"Exercise: {exercise_name}")
+            print(f"  Sessions: {len(top_sets)}")
+            print(f"  Avg Top Set: {mean:.2f}")
+            print(f"  Std Dev: {std_dev:.2f}")
+            print()
+
         sys.exit(0)
     session_volume = {sid: 0 for sid in sessions}
 
