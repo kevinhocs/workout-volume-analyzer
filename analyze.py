@@ -49,9 +49,16 @@ def load_sessions(conn):
 # ----------------------------------------------------------------------
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python analyze.py <path-to-db>")
+    if len(sys.argv) not in (2, 3):
+        print("Usage: python analyze.py <path-to-db> [--audit]")
         sys.exit(1)
+
+    audit_mode = False
+    if len(sys.argv) == 3:
+        if sys.argv[2] != "--audit":
+            print(f"Unknown option: {sys.argv[2]}")
+            sys.exit(1)
+        audit_mode = True
 
     db_path = Path(sys.argv[1])
 
@@ -72,7 +79,7 @@ def main():
     # Schema invariants
     # ------------------------------------------------------------------
 
-    required_tables = ["sessions", "sets"]
+    required_tables = ["sessions", "exercises", "sets"]
 
     for table in required_tables:
         if not table_exists(conn, table):
@@ -81,6 +88,7 @@ def main():
 
     required_columns = {
         "sessions": ["id", "date"],
+        "exercises": ["id", "name"],
         "sets": ["session_id", "reps", "weight"]
     }
 
@@ -95,6 +103,9 @@ def main():
     # ------------------------------------------------------------------
 
     sessions = load_sessions(conn)
+    if audit_mode:
+        print(f"Loaded {len(sessions)} sessions from database")
+        sys.exit(0)
     session_volume = {sid: 0 for sid in sessions}
 
     # ------------------------------------------------------------------
