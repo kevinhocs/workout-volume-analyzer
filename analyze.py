@@ -29,7 +29,7 @@ def parse_iso_date(value):
 def load_sessions(conn):
     sessions = {}
 
-    curr = conn.execute("SELECT id, date FROM sessions")
+    curr = conn.execute("SELECT workout_id, workout_date FROM workout")
     for session_id, date_str in curr.fetchall():
         parsed_date = parse_iso_date(date_str)
         if parsed_date is None:
@@ -79,7 +79,7 @@ def main():
     # Schema invariants
     # ------------------------------------------------------------------
 
-    required_tables = ["sessions", "exercises", "sets"]
+    required_tables = ["workout", "exercise", "exercise_log"]
 
     for table in required_tables:
         if not table_exists(conn, table):
@@ -87,9 +87,9 @@ def main():
             sys.exit(1)
 
     required_columns = {
-        "sessions": ["id", "date"],
-        "exercises": ["id", "name"],
-        "sets": ["session_id", "reps", "weight"]
+        "workout": ["workout_id", "workout_date"],
+        "exercise": ["exercise_id", "name"],
+        "exercise_log": ["workout_id", "reps", "weight_lbs", "sets"]
     }
 
     for table, columns in required_columns.items():
@@ -110,7 +110,7 @@ def main():
         print(f"Date range: {dates[0]} to {dates[-1]}")
 
         # Count exercise
-        curr = conn.execute("SELECT id, name FROM exercises")
+        curr = conn.execute("SELECT exercise_id, name FROM exercise")
         exercises = curr.fetchall()
 
         print(f"Distinct exercises: {len(exercises)}")
@@ -118,7 +118,7 @@ def main():
 
         for exercise_id, exercise_name in exercises:
             curr = conn.execute(
-                "SELECT MAX(weight) FROM sets WHERE exercise_id=? GROUP BY session_id",
+                "SELECT MAX(weight_lbs) FROM exercise_log WHERE exercise_id=? GROUP BY workout_id",
                 (exercise_id,)
             )
 
@@ -144,18 +144,18 @@ def main():
     # Set accumulation (enforce data invariants)
     # ------------------------------------------------------------------
 
-    curr = conn.execute("SELECT session_id, reps, weight FROM sets")
+    curr = conn.execute("SELECT workout_id, reps, weight_lbs, sets FROM exercise_log")
 
-    for session_id, reps, weight in curr.fetchall():
+    for workout_id, reps, weight, sets in curr.fetchall():
         if reps <= 0 or weight <= 0:
-            print(f"Error: invalid set data: reps={reps}, weight={weight} in session {session_id}")
+            print(f"Error: invalid set data: reps={reps}, weight={weight} in workout {workout_id}")
             sys.exit(1)
 
-        if session_id not in sessions:
-            print(f"Error: set references non-existent session: {session_id}")
+        if workout_id not in sessions:
+            print(f"Error: set references non-existent workout: {workout_id}")
             sys.exit(1)
 
-        session_volume[session_id] += reps * weight
+        session_volume[workout_id] += reps * weight * sets
 
     # ------------------------------------------------------------------
     # Weekly aggregation
