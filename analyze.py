@@ -142,6 +142,8 @@ def main():
     session_volume = {sid: 0 for sid in sessions}
     weekly_exercise_volume = {}
     exercise_best_1rm = {}
+    exercise_best_load = {}
+    exercise_best_load_reps = {}
 
     # ------------------------------------------------------------------
     # Set accumulation (enforce data invariants)
@@ -175,12 +177,16 @@ def main():
 
         # exercise 1RM tracking
         estimated_1rm = load * (1 + reps / 30)
-
-        # track best 1RM for this exercise
+        # track best estimated 1RM
         if exercise_name not in exercise_best_1rm:
             exercise_best_1rm[exercise_name] = estimated_1rm
         else:
             exercise_best_1rm[exercise_name] = max(exercise_best_1rm[exercise_name], estimated_1rm)
+
+        # track actual PR (heaviest load lifted)
+        if exercise_name not in exercise_best_load or load > exercise_best_load[exercise_name]:
+            exercise_best_load[exercise_name] = load
+            exercise_best_load_reps[exercise_name] = reps
 
         # determine the week
         iso_year, iso_week, _ = session_date.isocalendar()
@@ -218,11 +224,20 @@ def main():
         for exercise, v in sorted(weekly_exercise_volume.get((year, week), {}).items()):
             print(f"{exercise:<20} {int(v)}")
 
-    print("\n1 Rep Max Estimates")
+    print("\nEstimated 1RM")
     print("------------------")
 
     for exercise, est in sorted(exercise_best_1rm.items()):
         print(f"{exercise:<20} {int(round(est))}")
+
+    print("\nActual Personal Records")
+    print("----------")
+
+    for exercise in sorted(exercise_best_load):
+        load = exercise_best_load[exercise]
+        reps = exercise_best_load_reps[exercise]
+
+        print(f"{exercise:<20} {int(load)} x {reps}")
 
 
 if __name__ == "__main__":
