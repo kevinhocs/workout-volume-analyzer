@@ -139,14 +139,16 @@ def main():
 
         sys.exit(0)
     session_volume = {sid: 0 for sid in sessions}
+    weekly_exercise_volume = {}
 
     # ------------------------------------------------------------------
     # Set accumulation (enforce data invariants)
     # ------------------------------------------------------------------
 
-    curr = conn.execute("SELECT workout_id, reps, weight_lbs, sets FROM exercise_log")
+    curr = conn.execute("""SELECT workout_id, e.name, reps, weight_lbs, sets FROM exercise_log l
+                         JOIN exercise e ON l.exercise_id = e.exercise_id""")
 
-    for workout_id, reps, weight, sets in curr.fetchall():
+    for workout_id, exercise_name, reps, weight, sets in curr.fetchall():
         if reps <= 0 or weight <= 0:
             print(f"Error: invalid set data: reps={reps}, weight={weight} in workout {workout_id}")
             sys.exit(1)
@@ -155,7 +157,24 @@ def main():
             print(f"Error: set references non-existent workout: {workout_id}")
             sys.exit(1)
 
-        session_volume[workout_id] += reps * weight * sets
+        volume = reps * weight * sets
+
+        # session volume
+        session_volume[workout_id] += volume
+
+        # determine the week
+        session_date = sessions[workout_id]
+        iso_year, iso_week, _ = session_date.isocalendar()
+        week_key = (iso_year, iso_week)
+
+        # create week entry if missing
+        if week_key not in weekly_exercise_volume:
+            weekly_exercise_volume[week_key] = {}
+
+        # accumulate exercise volume for that week
+        weekly_exercise_volume[week_key][exercise_name] = (
+            weekly_exercise_volume[week_key].get(exercise_name, 0) + volume
+        )
 
     # ------------------------------------------------------------------
     # Weekly aggregation
@@ -172,7 +191,13 @@ def main():
         )
 
     for (year, week), volume in sorted(weekly_volume.items()):
-        print(f"{year}-W{week:02d} volume={int(volume)}")
+        print(f"\n{year}-W{week:02d} total_volume={int(volume)}")
+
+        print("Exercise Breakdown")
+        print("------------------")
+
+        for exercise, v in sorted(weekly_exercise_volume.get((year, week), {}).items()):
+            print(f"{exercise:<20} {int(v)}")
 
 
 if __name__ == "__main__":
