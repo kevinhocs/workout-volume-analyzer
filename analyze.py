@@ -146,6 +146,7 @@ def main():
     exercise_best_load = {}
     exercise_best_load_reps = {}
     exercise_pr_progress = {}
+    exercise_frequency = {}
 
     # ------------------------------------------------------------------
     # Set accumulation
@@ -172,7 +173,9 @@ def main():
                 sys.exit(1)
             load = bodyweight + weight
 
-            # TODO: Consider supporting bodyweight percentage (e.g., dips ≈ 0.9 * BW)
+        exercise_frequency[exercise_name] = exercise_frequency.get(exercise_name, 0) + 1
+
+        #TODO: Consider supporting bodyweight percentage (e.g., dips ≈ 0.9 * BW)
 
         volume = reps * load * sets
 
@@ -206,8 +209,6 @@ def main():
         weekly_exercise_volume[week_key][exercise_name] = (
             weekly_exercise_volume[week_key].get(exercise_name, 0) + volume
         )
-
-    # TODO: Add exercise frequency and session count analytics
 
     # ------------------------------------------------------------------
     # Weekly aggregation
@@ -257,6 +258,12 @@ def main():
         new_pr = exercise_best_1rm[exercise]
 
         print(f"{exercise:<20} {int(round(new_pr))} (+{int(round(diff))})")
+
+    print("\nExercise Frequency")
+    print("------------------")
+
+    for exercise, count in sorted(exercise_frequency.items()):
+        print(f"{exercise:<20} {count} sessions")
 
 
 if __name__ == "__main__":
