@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# TODO: Split this script into modules (db_utils, analytics, CLI)
 
 import sys
 import sqlite3
@@ -144,9 +145,10 @@ def main():
     exercise_best_1rm = {}
     exercise_best_load = {}
     exercise_best_load_reps = {}
+    exercise_pr_progress = {}
 
     # ------------------------------------------------------------------
-    # Set accumulation (enforce data invariants)
+    # Set accumulation
     # ------------------------------------------------------------------
 
     curr = conn.execute("""SELECT workout_id, e.name, reps, weight_lbs, sets FROM exercise_log l
@@ -170,36 +172,42 @@ def main():
                 sys.exit(1)
             load = bodyweight + weight
 
+            # TODO: Consider supporting bodyweight percentage (e.g., dips ≈ 0.9 * BW)
+
         volume = reps * load * sets
 
-        # session volume
         session_volume[workout_id] += volume
 
-        # exercise 1RM tracking
+        # Estimate 1RM and detect PR progression
         estimated_1rm = load * (1 + reps / 30)
-        # track best estimated 1RM
+
+        # Update best estimated 1RM and record PR improvement
         if exercise_name not in exercise_best_1rm:
             exercise_best_1rm[exercise_name] = estimated_1rm
-        else:
-            exercise_best_1rm[exercise_name] = max(exercise_best_1rm[exercise_name], estimated_1rm)
+        elif estimated_1rm > exercise_best_1rm[exercise_name]:
+            diff = estimated_1rm - exercise_best_1rm[exercise_name]
+            exercise_pr_progress[exercise_name] = diff
+            exercise_best_1rm[exercise_name] = estimated_1rm
 
-        # track actual PR (heaviest load lifted)
+        # Track actual PR (heaviest load lifted)
         if exercise_name not in exercise_best_load or load > exercise_best_load[exercise_name]:
             exercise_best_load[exercise_name] = load
             exercise_best_load_reps[exercise_name] = reps
 
-        # determine the week
+        # Determine the week
         iso_year, iso_week, _ = session_date.isocalendar()
         week_key = (iso_year, iso_week)
 
-        # create week entry if missing
+        # Initialize week bucket if needed
         if week_key not in weekly_exercise_volume:
             weekly_exercise_volume[week_key] = {}
 
-        # accumulate exercise volume for that week
+        # Accumulate exercise volume for that week
         weekly_exercise_volume[week_key][exercise_name] = (
             weekly_exercise_volume[week_key].get(exercise_name, 0) + volume
         )
+
+    # TODO: Add exercise frequency and session count analytics
 
     # ------------------------------------------------------------------
     # Weekly aggregation
@@ -238,6 +246,17 @@ def main():
         reps = exercise_best_load_reps[exercise]
 
         print(f"{exercise:<20} {int(load)} x {reps}")
+
+    # TODO: Detect PR progression over time windows (week-over-week)
+
+    print("\nNew PRs")
+    print("-------")
+
+    for exercise in sorted(exercise_pr_progress):
+        diff = exercise_pr_progress[exercise]
+        new_pr = exercise_best_1rm[exercise]
+
+        print(f"{exercise:<20} {int(round(new_pr))} (+{int(round(diff))})")
 
 
 if __name__ == "__main__":
