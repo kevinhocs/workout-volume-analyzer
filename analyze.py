@@ -1,50 +1,15 @@
 #!/usr/bin/env python3
-# TODO: Split this script into modules (db_utils, analytics, CLI)
 
 import sys
 import sqlite3
 from pathlib import Path
-from datetime import date
-from exercise_pattern import is_bodyweight_exercise
+
+from db_utils import table_exists, column_exists, load_sessions
+from analytics import analyze_sets
 
 # ----------------------------------------------------------------------
 # Schema / utility helpers
 # ----------------------------------------------------------------------
-
-def table_exists(conn, table_name):
-    curr = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type= 'table' AND name=?",
-        (table_name,)
-    )
-    return curr.fetchone() is not None
-
-def column_exists(conn, table, column):
-    curr = conn.execute(f"PRAGMA table_info({table})")
-    return any(row[1] == column for row in curr.fetchall())
-
-def parse_iso_date(value):
-    try:
-        return date.fromisoformat(value)
-    except ValueError:
-        return None
-
-def load_sessions(conn):
-    sessions = {}
-
-    curr = conn.execute("SELECT workout_id, workout_date, bodyweight_lbs FROM workout")
-    for session_id, date_str, bodyweight in curr.fetchall():
-        parsed_date = parse_iso_date(date_str)
-        if parsed_date is None:
-            print(f"Error: invalid date format: {date_str} in session {session_id}")
-            sys.exit(1)
-
-        sessions[session_id] = (parsed_date, bodyweight)
-
-    if not sessions:
-        print("Error: no sessions found in database")
-        sys.exit(1)
-
-    return sessions
 
 # ----------------------------------------------------------------------
 # Main entry point
@@ -103,8 +68,23 @@ def main():
     # ------------------------------------------------------------------
     # Canonical load: sessions
     # ------------------------------------------------------------------
+    try:
+        sessions = load_sessions(conn)
 
-    sessions = load_sessions(conn)
+        (
+            session_volume,
+            weekly_exercise_volume,
+            exercise_best_1rm,
+            exercise_best_load,
+            exercise_best_load_reps,
+            exercise_pr_progress,
+            exercise_sessions
+        ) = analyze_sets(conn, sessions)
+
+    except ValueError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
     if audit_mode:
         print(f"Total sessions loaded: {len(sessions)}")
 
@@ -140,77 +120,6 @@ def main():
             print()
 
         sys.exit(0)
-    session_volume = {sid: 0 for sid in sessions}
-    weekly_exercise_volume = {}
-    exercise_best_1rm = {}
-    exercise_best_load = {}
-    exercise_best_load_reps = {}
-    exercise_pr_progress = {}
-    exercise_sessions = {}
-
-    # ------------------------------------------------------------------
-    # Set accumulation
-    # ------------------------------------------------------------------
-
-    curr = conn.execute("""SELECT workout_id, e.name, reps, weight_lbs, sets 
-                        FROM exercise_log l
-                         JOIN exercise e ON l.exercise_id = e.exercise_id
-                        """)
-
-    for workout_id, exercise_name, reps, weight, sets in curr.fetchall():
-        if reps <= 0 or weight < 0:
-            print(f"Error: invalid set data: reps={reps}, weight={weight} in workout {workout_id}")
-            sys.exit(1)
-
-        if workout_id not in sessions:
-            print(f"Error: set references non-existent workout: {workout_id}")
-            sys.exit(1)
-
-        session_date, bodyweight = sessions[workout_id]
-
-        load = weight
-        if is_bodyweight_exercise(exercise_name):
-            if bodyweight is None:
-                print(f"Error: missing bodyweight for workout {workout_id} ({exercise_name})")
-                sys.exit(1)
-            load = bodyweight + weight
-
-        exercise_sessions.setdefault(exercise_name, set()).add(workout_id)
-
-        #TODO: Consider supporting bodyweight percentage (e.g., dips ≈ 0.9 * BW)
-
-        volume = reps * load * sets
-
-        session_volume[workout_id] += volume
-
-        # Estimate 1RM and detect PR progression
-        estimated_1rm = load * (1 + reps / 30)
-
-        # Update best estimated 1RM and record PR improvement
-        if exercise_name not in exercise_best_1rm:
-            exercise_best_1rm[exercise_name] = estimated_1rm
-        elif estimated_1rm > exercise_best_1rm[exercise_name]:
-            diff = estimated_1rm - exercise_best_1rm[exercise_name]
-            exercise_pr_progress[exercise_name] = diff
-            exercise_best_1rm[exercise_name] = estimated_1rm
-
-        # Track actual PR (heaviest load lifted)
-        if exercise_name not in exercise_best_load or load > exercise_best_load[exercise_name]:
-            exercise_best_load[exercise_name] = load
-            exercise_best_load_reps[exercise_name] = reps
-
-        # Determine the week
-        iso_year, iso_week, _ = session_date.isocalendar()
-        week_key = (iso_year, iso_week)
-
-        # Initialize week bucket if needed
-        if week_key not in weekly_exercise_volume:
-            weekly_exercise_volume[week_key] = {}
-
-        # Accumulate exercise volume for that week
-        weekly_exercise_volume[week_key][exercise_name] = (
-            weekly_exercise_volume[week_key].get(exercise_name, 0) + volume
-        )
 
     # ------------------------------------------------------------------
     # Weekly aggregation
