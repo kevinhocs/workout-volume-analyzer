@@ -4,7 +4,7 @@ import sys
 import sqlite3
 from pathlib import Path
 from datetime import date
-
+from exercise_pattern import is_bodyweight_exercise
 
 # ----------------------------------------------------------------------
 # Schema / utility helpers
@@ -30,14 +30,14 @@ def parse_iso_date(value):
 def load_sessions(conn):
     sessions = {}
 
-    curr = conn.execute("SELECT workout_id, workout_date FROM workout")
-    for session_id, date_str in curr.fetchall():
+    curr = conn.execute("SELECT workout_id, workout_date, bodyweight_lbs FROM workout")
+    for session_id, date_str, bodyweight in curr.fetchall():
         parsed_date = parse_iso_date(date_str)
         if parsed_date is None:
             print(f"Error: invalid date format: {date_str} in session {session_id}")
             sys.exit(1)
 
-        sessions[session_id] = parsed_date
+        sessions[session_id] = (parsed_date, bodyweight)
 
     if not sessions:
         print("Error: no sessions found in database")
@@ -88,7 +88,7 @@ def main():
             sys.exit(1)
 
     required_columns = {
-        "workout": ["workout_id", "workout_date"],
+        "workout": ["workout_id", "workout_date", "bodyweight_lbs"],
         "exercise": ["exercise_id", "name"],
         "exercise_log": ["workout_id", "reps", "weight_lbs", "sets"]
     }
@@ -107,7 +107,7 @@ def main():
     if audit_mode:
         print(f"Total sessions loaded: {len(sessions)}")
 
-        dates = sorted(sessions.values())
+        dates = sorted(session_date for session_date, _ in sessions.values())
         print(f"Date range: {dates[0]} to {dates[-1]}")
 
         # Count exercise
@@ -151,7 +151,7 @@ def main():
                          JOIN exercise e ON l.exercise_id = e.exercise_id""")
 
     for workout_id, exercise_name, reps, weight, sets in curr.fetchall():
-        if reps <= 0 or weight <= 0:
+        if reps <= 0 or weight < 0:
             print(f"Error: invalid set data: reps={reps}, weight={weight} in workout {workout_id}")
             sys.exit(1)
 
@@ -159,13 +159,22 @@ def main():
             print(f"Error: set references non-existent workout: {workout_id}")
             sys.exit(1)
 
-        volume = reps * weight * sets
+        session_date, bodyweight = sessions[workout_id]
+
+        load = weight
+        if is_bodyweight_exercise(exercise_name):
+            if bodyweight is None:
+                print(f"Error: missing bodyweight for workout {workout_id} ({exercise_name})")
+                sys.exit(1)
+            load = bodyweight + weight
+
+        volume = reps * load * sets
 
         # session volume
         session_volume[workout_id] += volume
 
         # exercise 1RM tracking
-        estimated_1rm = weight * (1 + reps / 30)
+        estimated_1rm = load * (1 + reps / 30)
 
         # track best 1RM for this exercise
         if exercise_name not in exercise_best_1rm:
@@ -174,7 +183,6 @@ def main():
             exercise_best_1rm[exercise_name] = max(exercise_best_1rm[exercise_name], estimated_1rm)
 
         # determine the week
-        session_date = sessions[workout_id]
         iso_year, iso_week, _ = session_date.isocalendar()
         week_key = (iso_year, iso_week)
 
@@ -193,7 +201,7 @@ def main():
 
     weekly_volume = {}
 
-    for session_id, session_date in sessions.items():
+    for session_id, (session_date, _) in sessions.items():
         iso_year, iso_week, _ = session_date.isocalendar()
         key = (iso_year, iso_week)
 
@@ -210,11 +218,11 @@ def main():
         for exercise, v in sorted(weekly_exercise_volume.get((year, week), {}).items()):
             print(f"{exercise:<20} {int(v)}")
 
-    print("\nStrength Estimates")
+    print("\n1 Rep Max Estimates")
     print("------------------")
 
     for exercise, est in sorted(exercise_best_1rm.items()):
-        print(f"{exercise:<20} {int(est)}")
+        print(f"{exercise:<20} {int(round(est))}")
 
 
 if __name__ == "__main__":
