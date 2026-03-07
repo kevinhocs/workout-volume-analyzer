@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 from datetime import date
 
+
 # ----------------------------------------------------------------------
 # Schema / utility helpers
 # ----------------------------------------------------------------------
