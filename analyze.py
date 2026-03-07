@@ -140,6 +140,7 @@ def main():
         sys.exit(0)
     session_volume = {sid: 0 for sid in sessions}
     weekly_exercise_volume = {}
+    exercise_best_1rm = {}
 
     # ------------------------------------------------------------------
     # Set accumulation (enforce data invariants)
@@ -161,6 +162,15 @@ def main():
 
         # session volume
         session_volume[workout_id] += volume
+
+        # exercise 1RM tracking
+        estimated_1rm = weight * (1 + reps / 30)
+
+        # track best 1RM for this exercise
+        if exercise_name not in exercise_best_1rm:
+            exercise_best_1rm[exercise_name] = estimated_1rm
+        else:
+            exercise_best_1rm[exercise_name] = max(exercise_best_1rm[exercise_name], estimated_1rm)
 
         # determine the week
         session_date = sessions[workout_id]
@@ -198,6 +208,12 @@ def main():
 
         for exercise, v in sorted(weekly_exercise_volume.get((year, week), {}).items()):
             print(f"{exercise:<20} {int(v)}")
+
+    print("\nStrength Estimates")
+    print("------------------")
+
+    for exercise, est in sorted(exercise_best_1rm.items()):
+        print(f"{exercise:<20} {int(est)}")
 
 
 if __name__ == "__main__":
