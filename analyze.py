@@ -146,14 +146,16 @@ def main():
     exercise_best_load = {}
     exercise_best_load_reps = {}
     exercise_pr_progress = {}
-    exercise_frequency = {}
+    exercise_sessions = {}
 
     # ------------------------------------------------------------------
     # Set accumulation
     # ------------------------------------------------------------------
 
-    curr = conn.execute("""SELECT workout_id, e.name, reps, weight_lbs, sets FROM exercise_log l
-                         JOIN exercise e ON l.exercise_id = e.exercise_id""")
+    curr = conn.execute("""SELECT workout_id, e.name, reps, weight_lbs, sets 
+                        FROM exercise_log l
+                         JOIN exercise e ON l.exercise_id = e.exercise_id
+                        """)
 
     for workout_id, exercise_name, reps, weight, sets in curr.fetchall():
         if reps <= 0 or weight < 0:
@@ -173,7 +175,7 @@ def main():
                 sys.exit(1)
             load = bodyweight + weight
 
-        exercise_frequency[exercise_name] = exercise_frequency.get(exercise_name, 0) + 1
+        exercise_sessions.setdefault(exercise_name, set()).add(workout_id)
 
         #TODO: Consider supporting bodyweight percentage (e.g., dips ≈ 0.9 * BW)
 
@@ -262,9 +264,8 @@ def main():
     print("\nExercise Frequency")
     print("------------------")
 
-    for exercise, count in sorted(exercise_frequency.items()):
-        print(f"{exercise:<20} {count} sessions")
-
+    for exercise, workout_ids in sorted(exercise_sessions.items()):
+        print(f"{exercise:<20} {len(workout_ids)} sessions")
 
 if __name__ == "__main__":
     main()
