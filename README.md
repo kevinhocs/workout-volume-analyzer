@@ -8,6 +8,11 @@ A correctness-focused analysis tool for validating structured workout data and c
 - Validates required tables and columns explicitly
 - Enforces data invariants (dates, foreign keys, numeric constraints)
 - Computes weekly training volume using ISO-8601 calendar weeks
+- Tracks per-exercise volume breakdown
+- Estimates 1RM using the Epley formula
+- Detects actual personal records (heaviest load lifted)
+- Detects estimated strength progression (new PRs)
+- Normalizes bodyweight exercises using bodyweight + external load
 - Produces deterministic, sorted output
 - Fails fast on invalid or inconsistent data
 
@@ -34,22 +39,30 @@ The focus is on:
 
 The analyzer assumes the following schema contract.
 
-### `sessions`
+### `workout`
 
 | column | type | constraints |
 |------|------|-------------|
-| id | INTEGER | primary key |
-| date | TEXT | ISO-8601 (`YYYY-MM-DD`) |
+| workout_id | INTEGER | primary key |
+| workout_date | TEXT | ISO-8601 (`YYYY-MM-DD`) |
+| bodyweight_lbs | REAL | nullable |
 
-### `sets`
+### `exercise`
 
 | column | type | constraints |
 |------|------|-------------|
-| session_id | INTEGER | references `sessions.id` |
+| exercise_id | INTEGER | primary key |
+| name | TEXT | exercise identifier |
+
+### `exercise_log`
+
+| column | type | constraints |
+|------|------|-------------|
+| workout_id | INTEGER | references `workout.workout_id` |
+| exercise_id | INTEGER | references `exercise.exercise_id` |
 | reps | INTEGER | > 0 |
-| weight | REAL | > 0 |
-
-Any deviation from this contract will cause immediate failure.
+| weight_lbs | REAL | ≥ 0 |
+| sets | INTEGER | > 0 |
 
 ## Volume Definition
 
@@ -60,13 +73,65 @@ sum(weight × repetitions) across all sets in a given ISO-8601 calendar week
 
 Units depend on the data stored in the database (e.g., pounds or kilograms × repetitions).
 
-## Example Output
+## Example Weekly Summary
 ```
-2026-W05 volume=1100
-2026-W06 volume=600
+2026-W06 total_volume=21000
 ```
 
 Each line represents total training volume for one ISO calendar week.
+
+## Strength Analytics
+
+The analyzer computes several strength metrics.
+
+### Estimated 1RM
+
+Estimated one-rep max values are calculated using the Epley formula:
+```
+1RM = load × (1 + reps / 30)
+```
+
+The highest estimated value per exercise is retained.
+
+### Actual Personal Records
+
+The analyzer tracks the heaviest load lifted for each exercise, regardless of repetition count.
+
+Example:
+```
+Romanian Deadlift    340 x 7
+```
+
+### PR Progression
+
+If a newly estimated 1RM exceeds the previous best, the analyzer reports the improvement.
+
+Example:
+```
+Romanian Deadlift    431 (+12)
+```
+
+## Bodyweight Exercise Handling
+For bodyweight movements (e.g., dips, pull-ups), total load is modeled as:
+```
+total_load = bodyweight + external_weight
+```
+
+This allows bodyweight exercises to be incorporated into volume and strength calculations consistently with barbell movements.
+
+## Audit Mode
+Run audit mode:
+```
+py analyze.py path/to/database.db --audit
+```
+Audit mode reports dataset statistics such as:
+
+- number of sessions
+- exercise frequency
+- average top set weight
+- standard deviation of top sets
+
+This mode is useful for validating dataset quality before analysis.
 
 ## Error Handling
 The analyzer exits immediately with a descriptive error message if any invariant is violated, including:
