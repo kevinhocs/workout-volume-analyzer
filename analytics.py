@@ -75,29 +75,24 @@ def analyze_sets(conn, sessions):
             exercise_best_load[exercise_name] = load
             exercise_best_load_reps[exercise_name] = reps
 
-        # Determine the week
-        iso_year, iso_week, _ = session_date.isocalendar()
-        week_key = (iso_year, iso_week)
-
         # Initialize week bucket if needed
-        if week_key not in weekly_exercise_volume:
-            weekly_exercise_volume[week_key] = {}
+        weekly_exercise_volume.setdefault(week_key, {})
 
         # Accumulate exercise volume for that week
         weekly_exercise_volume[week_key][exercise_name] = (
             weekly_exercise_volume[week_key].get(exercise_name, 0) + volume
         )
 
-    return (
-        session_volume,
-        weekly_exercise_volume,
-        exercise_best_1rm,
-        exercise_best_load,
-        exercise_best_load_reps,
-        exercise_pr_progress,
-        exercise_sessions,
-        exercise_weekly_1rm
-        )
+    return {
+        "session_volume": session_volume,
+        "weekly_exercise_volume": weekly_exercise_volume,
+        "exercise_best_1rm": exercise_best_1rm,
+        "exercise_best_load": exercise_best_load,
+        "exercise_best_load_reps": exercise_best_load_reps,
+        "exercise_pr_progress": exercise_pr_progress,
+        "exercise_sessions": exercise_sessions,
+        "exercise_weekly_1rm": exercise_weekly_1rm
+    }
 
 # ----------------------------------------------------------------------
 # Weekly aggregation utilities

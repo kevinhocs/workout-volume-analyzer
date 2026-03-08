@@ -71,16 +71,16 @@ def main():
     try:
         sessions = load_sessions(conn)
 
-        (
-            session_volume,
-            weekly_exercise_volume,
-            exercise_best_1rm,
-            exercise_best_load,
-            exercise_best_load_reps,
-            exercise_pr_progress,
-            exercise_sessions,
-            exercise_weekly_1rm
-        ) = analyze_sets(conn, sessions)
+        results = analyze_sets(conn, sessions)
+
+        session_volume = results["session_volume"]
+        weekly_exercise_volume = results["weekly_exercise_volume"]
+        exercise_best_1rm = results["exercise_best_1rm"]
+        exercise_best_load = results["exercise_best_load"]
+        exercise_best_load_reps = results["exercise_best_load_reps"]
+        exercise_pr_progress = results["exercise_pr_progress"]
+        exercise_sessions = results["exercise_sessions"]
+        exercise_weekly_1rm = results["exercise_weekly_1rm"]
 
     except ValueError as e:
         print(f"Error: {e}")
