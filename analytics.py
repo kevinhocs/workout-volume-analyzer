@@ -111,3 +111,34 @@ def aggregate_weekly_volume(sessions, session_volume):
         )
 
     return weekly_volume
+
+# ----------------------------------------------------------------------
+# Plateau detection
+# ----------------------------------------------------------------------
+
+def detect_plateaus(exercise_weekly_1rm, threshold=2):
+
+    plateaus = {}
+
+    for exercise, weeks in exercise_weekly_1rm.items():
+
+        if len(weeks) < threshold + 1:
+            continue
+
+        sorted_weeks = sorted(weeks.items())
+
+        best = None
+        weeks_since_pr = 0
+
+        for _, value in sorted_weeks:
+
+            if best is None or value > best:
+                best = value
+                weeks_since_pr = 0
+            else:
+                weeks_since_pr += 1
+
+        if weeks_since_pr >= threshold:
+            plateaus[exercise] = weeks_since_pr
+
+    return plateaus

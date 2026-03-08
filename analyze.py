@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from db_utils import table_exists, column_exists, load_sessions
-from analytics import analyze_sets, aggregate_weekly_volume
+from analytics import analyze_sets, aggregate_weekly_volume, detect_plateaus
 
 def header(title):
     print(f"\n{title}")
@@ -71,6 +71,10 @@ def main():
     try:
         sessions = load_sessions(conn)
 
+        if not sessions:
+            print("No workout sessions found in database.")
+            sys.exit(1)
+
         results = analyze_sets(conn, sessions)
 
         session_volume = results["session_volume"]
@@ -81,6 +85,8 @@ def main():
         exercise_pr_progress = results["exercise_pr_progress"]
         exercise_sessions = results["exercise_sessions"]
         exercise_weekly_1rm = results["exercise_weekly_1rm"]
+
+        plateaus = detect_plateaus(exercise_weekly_1rm)
 
     except ValueError as e:
         print(f"Error: {e}")
@@ -194,6 +200,14 @@ def main():
                 print(f"  {year}-W{week:02d}  {int(round(value))} ({sign}{int(round(diff))})")
 
             prev_1rm = value
+
+    header("Plateau Detection")
+
+    if not plateaus:
+        print("None")
+    else:
+        for exercise, weeks in sorted(plateaus.items()):
+            print(f"{exercise:<22} plateau ({weeks} weeks)")
 
     header("Exercise Frequency")
 
