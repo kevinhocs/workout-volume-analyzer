@@ -1,5 +1,9 @@
 from exercise_pattern import is_bodyweight_exercise
 
+# ----------------------------------------------------------------------
+# Set-level analytics
+# ----------------------------------------------------------------------
+
 def analyze_sets(conn, sessions):
 
     session_volume = {sid: 0 for sid in sessions}
@@ -10,9 +14,9 @@ def analyze_sets(conn, sessions):
     exercise_pr_progress = {}
     exercise_sessions = {}
 
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     # Set accumulation
-    # ------------------------------------------------------------------
+    # ----------------------------------------------------------------------
 
     curr = conn.execute("""
     SELECT workout_id, e.name, reps, weight_lbs, sets 
@@ -81,3 +85,21 @@ def analyze_sets(conn, sessions):
         exercise_pr_progress,
         exercise_sessions
         )
+
+# ----------------------------------------------------------------------
+# Weekly aggregation utilities
+# ----------------------------------------------------------------------
+
+
+def aggregate_weekly_volume(sessions, session_volume):
+    weekly_volume = {}
+
+    for session_id, (session_date, _) in sessions.items():
+        iso_year, iso_week, _ = session_date.isocalendar()
+        key = (iso_year, iso_week)
+
+        weekly_volume[key] = (
+            weekly_volume.get(key, 0) + session_volume[session_id]
+        )
+
+    return weekly_volume

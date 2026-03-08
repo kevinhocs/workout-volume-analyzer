@@ -5,7 +5,11 @@ import sqlite3
 from pathlib import Path
 
 from db_utils import table_exists, column_exists, load_sessions
-from analytics import analyze_sets
+from analytics import analyze_sets, aggregate_weekly_volume
+
+def header(title):
+    print(f"\n{title}")
+    print("=" * len(title))
 
 # ----------------------------------------------------------------------
 # Main entry point
@@ -118,59 +122,52 @@ def main():
         sys.exit(0)
 
     # ------------------------------------------------------------------
-    # Weekly aggregation
+    # Reporting
     # ------------------------------------------------------------------
+    weekly_volume = aggregate_weekly_volume(sessions, session_volume)
 
-    weekly_volume = {}
-
-    for session_id, (session_date, _) in sessions.items():
-        iso_year, iso_week, _ = session_date.isocalendar()
-        key = (iso_year, iso_week)
-
-        weekly_volume[key] = (
-            weekly_volume.get(key, 0) + session_volume[session_id]
-        )
+    header("Weekly Training Volume")
 
     for (year, week), volume in sorted(weekly_volume.items()):
-        print(f"\n{year}-W{week:02d} total_volume={int(volume)}")
-
-        print("Exercise Breakdown")
-        print("------------------")
+        print(f"\n{year}-W{week:02d}  total_volume={int(volume)}")
 
         for exercise, v in sorted(weekly_exercise_volume.get((year, week), {}).items()):
-            print(f"{exercise:<20} {int(v)}")
+            print(f"  {exercise:<22} {int(v)}")
 
-    print("\nEstimated 1RM")
-    print("------------------")
+    header("Estimated 1RM")
 
     for exercise, est in sorted(exercise_best_1rm.items()):
-        print(f"{exercise:<20} {int(round(est))}")
+        print(f"{exercise:<22} {int(round(est))}")
 
-    print("\nActual Personal Records")
-    print("----------")
+    header("Actual Personal Records")
 
-    for exercise in sorted(exercise_best_load):
-        load = exercise_best_load[exercise]
-        reps = exercise_best_load_reps[exercise]
+    if not exercise_best_load:
+        print("None")
+    else:
+        for exercise in sorted(exercise_best_load):
+            load = exercise_best_load[exercise]
+            reps = exercise_best_load_reps[exercise]
 
-        print(f"{exercise:<20} {int(load)} x {reps}")
+            print(f"{exercise:<22} {int(load)} x {reps}")
 
     # TODO: Detect PR progression over time windows (week-over-week)
 
-    print("\nNew PRs")
-    print("-------")
+    header("New PRs")
 
-    for exercise in sorted(exercise_pr_progress):
-        diff = exercise_pr_progress[exercise]
-        new_pr = exercise_best_1rm[exercise]
+    if not exercise_pr_progress:
+        print("None")
+    else:
+        for exercise in sorted(exercise_pr_progress):
+            diff = exercise_pr_progress[exercise]
+            new_pr = exercise_best_1rm[exercise]
+            print(f"{exercise:<22} {int(round(new_pr))} (+{int(round(diff))})")
 
-        print(f"{exercise:<20} {int(round(new_pr))} (+{int(round(diff))})")
-
-    print("\nExercise Frequency")
-    print("------------------")
+    header("Exercise Frequency")
 
     for exercise, workout_ids in sorted(exercise_sessions.items()):
-        print(f"{exercise:<20} {len(workout_ids)} sessions")
+        count = len(workout_ids)
+        label = "session" if count == 1 else "sessions"
+        print(f"{exercise:<22} {count} {label}")
 
 if __name__ == "__main__":
     main()
