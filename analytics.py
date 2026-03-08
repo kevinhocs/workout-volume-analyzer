@@ -142,3 +142,32 @@ def detect_plateaus(exercise_weekly_1rm, threshold=2):
             plateaus[exercise] = weeks_since_pr
 
     return plateaus
+
+# ----------------------------------------------------------------------
+# Volume volatility detection
+# ----------------------------------------------------------------------
+def detect_volume_volatility(weekly_volume, spike=1.5, drop=0.6):
+
+    volatility = []
+
+    sorted_weeks = sorted(weekly_volume.items())
+
+    prev_volume = None
+
+    for (year, week), volume in sorted_weeks:
+
+        if prev_volume is not None:
+
+            change = volume / prev_volume
+
+            if change >= spike:
+                pct = int((change - 1) * 100)
+                volatility.append((year, week, "spike", pct))
+
+            elif change <= drop:
+                pct = int((1 - change) * 100)
+                volatility.append((year, week, "drop", pct))
+
+        prev_volume = volume
+
+    return volatility
