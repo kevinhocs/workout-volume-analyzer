@@ -20,14 +20,14 @@ def analyze_sets(conn, sessions):
     # ----------------------------------------------------------------------
 
     curr = conn.execute("""
-    SELECT workout_id, e.name, reps, weight_lbs, sets 
-    FROM exercise_log l
-    JOIN exercise e ON l.exercise_id = e.exercise_id
+    SELECT s.workout_id, e.name, s.reps, s.weight_lbs
+    FROM sets s
+    JOIN exercise e ON s.exercise_id = e.exercise_id
     """)
 
-    for workout_id, exercise_name, reps, weight, sets in curr.fetchall():
-        if reps <= 0 or sets <= 0 or weight < 0:
-            raise ValueError(f"invalid set data: reps={reps}, weight={weight}, sets={sets} in workout {workout_id}")
+    for workout_id, exercise_name, reps, weight in curr:
+        if reps <= 0 or weight < 0:
+            raise ValueError(f"invalid set data: reps={reps}, weight={weight} in workout {workout_id}")
 
         if workout_id not in sessions:
             raise ValueError(f"set references non-existent workout: {workout_id}")
@@ -44,7 +44,7 @@ def analyze_sets(conn, sessions):
 
         #TODO: Consider supporting bodyweight percentage (e.g., dips ≈ 0.9 * BW)
 
-        volume = reps * load * sets
+        volume = reps * load
 
         session_volume[workout_id] += volume
 
@@ -66,8 +66,11 @@ def analyze_sets(conn, sessions):
         if exercise_name not in exercise_best_1rm:
             exercise_best_1rm[exercise_name] = estimated_1rm
         elif estimated_1rm > exercise_best_1rm[exercise_name]:
+
             diff = estimated_1rm - exercise_best_1rm[exercise_name]
-            exercise_pr_progress[exercise_name] = diff
+            exercise_pr_progress[exercise_name] = (
+            exercise_pr_progress.get(exercise_name, 0) + diff
+            )
             exercise_best_1rm[exercise_name] = estimated_1rm
 
         # Track actual PR (heaviest load lifted)

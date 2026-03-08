@@ -43,7 +43,7 @@ def main():
     # Schema invariants
     # ------------------------------------------------------------------
 
-    required_tables = ["workout", "exercise", "exercise_log"]
+    required_tables = ["workout", "exercise", "sets"]
 
     for table in required_tables:
         if not table_exists(conn, table):
@@ -53,7 +53,7 @@ def main():
     required_columns = {
         "workout": ["workout_id", "workout_date", "bodyweight_lbs"],
         "exercise": ["exercise_id", "name"],
-        "exercise_log": ["workout_id", "reps", "weight_lbs", "sets"]
+        "sets": ["workout_id", "exercise_id", "reps", "weight_lbs"]
     }
 
     for table, columns in required_columns.items():
@@ -106,7 +106,7 @@ def main():
 
         for exercise_id, exercise_name in exercises:
             curr = conn.execute(
-                "SELECT MAX(weight_lbs) FROM exercise_log WHERE exercise_id=? GROUP BY workout_id",
+                "SELECT MAX(weight_lbs) FROM sets WHERE exercise_id=? GROUP BY workout_id",
                 (exercise_id,)
             )
 
@@ -128,8 +128,7 @@ def main():
         sys.exit(0)
 
     print_reports(
-        sessions,
-        session_volume,
+        weekly_volume,
         weekly_exercise_volume,
         exercise_best_1rm,
         exercise_best_load,
@@ -138,7 +137,8 @@ def main():
         exercise_sessions,
         exercise_weekly_1rm,
         plateaus,
-    )
+        volatility,
+        )
 
 
 if __name__ == "__main__":
