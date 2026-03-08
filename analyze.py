@@ -78,7 +78,8 @@ def main():
             exercise_best_load,
             exercise_best_load_reps,
             exercise_pr_progress,
-            exercise_sessions
+            exercise_sessions,
+            exercise_weekly_1rm
         ) = analyze_sets(conn, sessions)
 
     except ValueError as e:
@@ -128,11 +129,25 @@ def main():
 
     header("Weekly Training Volume")
 
+    prev_volume = None
+
     for (year, week), volume in sorted(weekly_volume.items()):
-        print(f"\n{year}-W{week:02d}  total_volume={int(volume)}")
+
+        if prev_volume is None:
+            trend = ""
+        elif volume > prev_volume:
+            trend = " ↑"
+        elif volume < prev_volume:
+            trend = " ↓"
+        else:
+            trend = " →"
+
+        print(f"\n{year}-W{week:02d}  total_volume={int(volume)}{trend}")
 
         for exercise, v in sorted(weekly_exercise_volume.get((year, week), {}).items()):
             print(f"  {exercise:<22} {int(v)}")
+
+        prev_volume = volume
 
     header("Estimated 1RM")
 
@@ -161,6 +176,24 @@ def main():
             diff = exercise_pr_progress[exercise]
             new_pr = exercise_best_1rm[exercise]
             print(f"{exercise:<22} {int(round(new_pr))} (+{int(round(diff))})")
+
+    header("Strength Progression")
+
+    for exercise, weeks in sorted(exercise_weekly_1rm.items()):
+        print(f"\n{exercise}")
+
+        prev_1rm = None
+
+        for (year, week), value in sorted(weeks.items()):
+
+            if prev_1rm is None:
+                print(f"  {year}-W{week:02d}  {int(round(value))}")
+            else:
+                diff = value - prev_1rm
+                sign = "+" if diff >= 0 else ""
+                print(f"  {year}-W{week:02d}  {int(round(value))} ({sign}{int(round(diff))})")
+
+            prev_1rm = value
 
     header("Exercise Frequency")
 

@@ -13,6 +13,7 @@ def analyze_sets(conn, sessions):
     exercise_best_load_reps = {}
     exercise_pr_progress = {}
     exercise_sessions = {}
+    exercise_weekly_1rm = {}
 
     # ----------------------------------------------------------------------
     # Set accumulation
@@ -49,6 +50,17 @@ def analyze_sets(conn, sessions):
 
         # Estimate 1RM and detect PR progression
         estimated_1rm = load * (1 + reps / 30)
+        
+        # Track weekly best 1RM
+        iso_year, iso_week, _ = session_date.isocalendar()
+        week_key = (iso_year, iso_week)
+
+        exercise_weekly_1rm.setdefault(exercise_name, {})
+
+        current = exercise_weekly_1rm[exercise_name].get(week_key)
+
+        if current is None or estimated_1rm > current:
+            exercise_weekly_1rm[exercise_name][week_key] = estimated_1rm
 
         # Update best estimated 1RM and record PR improvement
         if exercise_name not in exercise_best_1rm:
@@ -83,7 +95,8 @@ def analyze_sets(conn, sessions):
         exercise_best_load,
         exercise_best_load_reps,
         exercise_pr_progress,
-        exercise_sessions
+        exercise_sessions,
+        exercise_weekly_1rm
         )
 
 # ----------------------------------------------------------------------
