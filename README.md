@@ -18,13 +18,11 @@ A correctness-focused analysis tool for validating structured workout data and c
 
 ## Why This Project Exists
 
-This project was built to demonstrate engineering judgment around data correctness, not feature breadth or presentation.
+This project emphasizes **data correctness and invariant enforcement** over feature breadth.
 
-The focus is on:
-- explicit schema contracts
-- invariant enforcement
-- fail-fast behavior
-- deterministic computation
+Rather than focusing on visualization or UI layers, the analyzer demonstrates how
+structured data pipelines can be built with explicit schema contracts and deterministic
+computation.
 
 ## Design Overview
 
@@ -54,21 +52,29 @@ The analyzer assumes the following schema contract.
 | exercise_id | INTEGER | primary key |
 | name | TEXT | exercise identifier |
 
-### `exercise_log`
+### `sets`
 
 | column | type | constraints |
 |------|------|-------------|
+| set_id | INTEGER | primary key |
 | workout_id | INTEGER | references `workout.workout_id` |
 | exercise_id | INTEGER | references `exercise.exercise_id` |
+| set_number | INTEGER | > 0 |
 | reps | INTEGER | > 0 |
 | weight_lbs | REAL | ≥ 0 |
-| sets | INTEGER | > 0 |
 
 ## Volume Definition
 
 Weekly training volume is defined as:
 ```
-sum(weight × repetitions) across all sets in a given ISO-8601 calendar week
+sum(effective_load × repetitions)
+```
+
+where
+```
+effective_load =
+    weight_lbs                 (non-bodyweight exercises)
+    bodyweight + weight_lbs    (bodyweight exercises)
 ```
 
 Units depend on the data stored in the database (e.g., pounds or kilograms × repetitions).
@@ -161,7 +167,45 @@ py analyze.py path/to/database.db
 
 Results are printed to stdout.
 
-## Testing
+## Data Sources
 
-A small helper script (make_test_db.py) is included to generate a deterministic test database.
-Invariant enforcement was validated by manually introducing invalid test data (e.g., bad dates, invalid foreign keys, non-positive values) and confirming the analyzer fails fast.
+The analyzer can operate on any SQLite database that satisfies the expected schema.
+
+Two typical use cases:
+
+### 1. Analyze data from the Workout Logger application
+
+This tool was designed to operate directly on databases produced by the companion project:
+
+Workout Logger  
+https://github.com/kevinhocs/workout-logger
+
+Example:
+```
+py analyze.py workout.db
+```
+
+This allows offline analysis of real training data exported from the logging application.
+
+### 2. Run locally using the included sample dataset
+
+A deterministic example dataset is included under:
+```
+sample_data/workout_sample.db
+```
+
+This dataset intentionally demonstrates:
+
+- strength progression
+- plateaus
+- regression
+- bodyweight exercises
+- weighted bodyweight exercises
+- weekly training volume variation
+
+Run:
+```
+py analyze.py sample_data/workout_sample.db
+```
+
+This allows the analyzer to be evaluated without requiring the workout logger application.

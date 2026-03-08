@@ -1,2 +1,2 @@
 *.pyc
-test.db
+test.db*.db 
